@@ -2,21 +2,25 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
-	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
-	"time"
+	"syscall"
 
 	"github.com/go-logr/logr"
 	"github.com/pjbgf/kube-audit-log-enricher/pkg/audit"
 	"github.com/pjbgf/kube-audit-log-enricher/pkg/kube"
 	"k8s.io/klog/klogr"
+
+	"github.com/cirocosta/dmesg_exporter/kmsg"
+	"github.com/cirocosta/dmesg_exporter/reader"
 )
 
 var (
-	logFile = "/var/log/syslog"
+	logFile = "/dev/kmsg"
 	logger  logr.Logger
 )
 
@@ -31,7 +35,7 @@ func main() {
 	logger.V(1).Info("starting log-exporter on node: ", nodeName)
 
 	auditLines := make(chan string)
-	go tail(logFile, auditLines)
+	go tailDevice(logFile, auditLines)
 
 	for {
 		line := <-auditLines
@@ -62,32 +66,54 @@ func main() {
 	}
 }
 
-func tail(filePath string, lines chan string) error {
-	file, err := os.Open(filepath.Clean(filePath))
-	if err != nil {
-		return fmt.Errorf("open file '%s': %v", filePath, err)
-	}
-	defer func() {
-		cerr := file.Close()
-		if err == nil {
-			err = cerr
-		}
-	}()
+func blockAndCancelOnSignal(cancel context.CancelFunc) {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	<-sigChan
 
-	offset, err := file.Seek(0, io.SeekEnd)
-	buffer := make([]byte, 1024, 1024)
+	cancel()
+}
+
+func tailDevice(device string, msgs chan string) {
+	file, err := os.Open(device)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	// seek to the end of device
+	_, err = file.Seek(0, os.SEEK_END)
+	if err != nil {
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go blockAndCancelOnSignal(cancel)
+
+	var (
+		r        = reader.NewReader(file)
+		messages = make(chan *kmsg.Message, 1)
+	)
+
+	kmsgErrorsChan := r.Listen(ctx, messages)
+
 	for {
-		readBytes, err := file.ReadAt(buffer, offset)
-		if err != nil {
-			if err != io.EOF {
-				return fmt.Errorf("read buffer: %v", err)
+		select {
+		case err = <-kmsgErrorsChan:
+			return
+		case message := <-messages:
+			if message == nil {
+				return
 			}
+
+			if message.Facility != kmsg.FacilityKern {
+				continue
+			}
+
+			msgs <- message.Message
 		}
-		offset += int64(readBytes)
-		if readBytes != 0 {
-			lines <- string(buffer[:readBytes])
-		}
-		time.Sleep(time.Second)
 	}
 }
 

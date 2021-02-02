@@ -49,7 +49,7 @@ metadata:
 spec:
   containers:
   - name: export
-    image: paulinhu/kube-audit-log-enricher:latest
+    image: paulinhu/kube-audit-log-enricher:da4aafb
     
     securityContext:
       readOnlyRootFilesystem: true
@@ -65,9 +65,8 @@ spec:
           fieldPath: spec.nodeName
 
     volumeMounts:
-    - mountPath: /var/log/syslog
+    - mountPath: /dev/kmsg
       name: syslog
-      readOnly: true
 
   # hostPID required in order to use cgroups to map Process IDs to Pod IDs
   hostPID: true
@@ -81,8 +80,10 @@ spec:
       type: Localhost
       localhostProfile: operator/default/general/profile-complain.json
 
+  nodeName: kube-worker1
+
   volumes:
   - name: syslog
     hostPath:
-      path: /var/log/syslog
-      type: File
+      path: /dev/kmsg
+      type: CharDevice
