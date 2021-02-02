@@ -1,0 +1,88 @@
+apiVersion: security-profiles-operator.x-k8s.io/v1alpha1
+kind: SeccompProfile
+metadata:
+  name: profile-complain
+spec:
+  defaultAction: "SCMP_ACT_LOG"
+  targetWorkload: "general"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: log-exporter
+  #TODO: Move to kube-system
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: log-exporter-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: log-exporter-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: log-exporter-role
+subjects:
+- kind: ServiceAccount
+  name: log-exporter
+  namespace: default
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: export
+  name: export
+spec:
+  containers:
+  - name: export
+    image: paulinhu/kube-audit-log-enricher:latest
+    
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+
+      capabilities:
+        drop: ["ALL"]
+
+    env:
+    - name: NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+
+    volumeMounts:
+    - mountPath: /var/log/syslog
+      name: syslog
+      readOnly: true
+
+  # hostPID required in order to use cgroups to map Process IDs to Pod IDs
+  hostPID: true
+  
+  serviceAccount: log-exporter
+
+  # TODO: remove
+  securityContext:
+
+    seccompProfile:
+      type: Localhost
+      localhostProfile: operator/default/general/profile-complain.json
+
+  volumes:
+  - name: syslog
+    hostPath:
+      path: /var/log/syslog
+      type: File

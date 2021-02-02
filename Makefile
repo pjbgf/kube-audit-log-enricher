@@ -1,12 +1,13 @@
-BINARY_NAME := $(shell basename "$(PWD)")
+BINARY_NAME := "log-enricher"
+IMAGE_NAME := $(shell basename "$(PWD)")
 VERSION := $(shell git describe --tags --always)
 
 GOBASE := $(shell pwd)
 GOPATH := $(GOBASE)/vendor:$(GOBASE)
 GOBIN := $(GOBASE)/bin
-GOFILES := $(wildcard cmd/*.go)
+GOFILES := $(wildcard *.go)
 
-GOSECNAME := "gosec_2.0.0_linux_amd64"
+GOSECNAME := "gosec_2.6.1_linux_amd64"
 
 LDFLAGS :=-ldflags "-w -extldflags -static"
 
@@ -30,20 +31,16 @@ push:
 	@-$(MAKE) docker-push
 
 docker-build: 
-	@echo "  >  Building image $(REGISTRY)/$(BINARY_NAME):$(VERSION)"
-	@docker build -t $(REGISTRY)/$(BINARY_NAME):$(VERSION) .
+	@echo "  >  Building image $(REGISTRY)/$(IMAGE_NAME):$(VERSION)"
+	@docker build -t $(REGISTRY)/$(IMAGE_NAME):$(VERSION) .
 
 docker-push: 
-	@echo "  >  Building image $(REGISTRY)/$(BINARY_NAME):$(VERSION)"
-	@docker build -t $(REGISTRY)/$(BINARY_NAME):$(VERSION) .
+	@echo "  >  Building image $(REGISTRY)/$(IMAGE_NAME):$(VERSION)"
+	@docker build -t $(REGISTRY)/$(IMAGE_NAME):$(VERSION) .
 
 test: go-test
 
-go-compile: go-get go-build
-
-go-get:
-	@echo "  >  Checking if there is any missing dependencies..."
-	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go get $(get)
+go-compile: go-build
 
 go-build:
 	@echo "  >  Building binary..."
@@ -59,11 +56,11 @@ go-clean:
 
 go-test:
 	@echo "  >  Running tests"
-	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go test ./...
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go test -mod=mod ./...
 
 go-test-coverage:
 	@echo "  >  Running tests"
-	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go test -coverprofile=coverage.txt -covermode=atomic ./... 
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go test -mod=mod -coverprofile=coverage.txt -covermode=atomic ./... 
 
 
 verify: verify-gospec
