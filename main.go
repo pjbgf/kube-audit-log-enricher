@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -62,11 +63,16 @@ func main() {
 }
 
 func tail(filePath string, lines chan string) error {
-	file, err := os.Open(filePath)
+	file, err := os.Open(filepath.Clean(filePath))
 	if err != nil {
 		return fmt.Errorf("open file '%s': %v", filePath, err)
 	}
-	defer file.Close()
+	defer func() {
+		cerr := file.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
 
 	offset, err := file.Seek(0, io.SeekEnd)
 	buffer := make([]byte, 1024, 1024)
@@ -87,12 +93,17 @@ func tail(filePath string, lines chan string) error {
 
 func getContainerID(processID int) string {
 	cgroupFile := fmt.Sprintf("/proc/%d/cgroup", processID)
-	file, err := os.Open(cgroupFile)
+	file, err := os.Open(filepath.Clean(cgroupFile))
 	if err != nil {
 		logger.V(8).Info("could not open cgroup", "process-id", processID)
 		return ""
 	}
-	defer file.Close()
+	defer func() {
+		cerr := file.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
 
 	// extracts crio format from cgroup:
 	// 0::/system.slice/crio-conmon-5819a498721cf8bb7e334809c9e48aa310bfc98801eb8017034ad17fb0749920.scope
