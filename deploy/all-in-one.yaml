@@ -49,14 +49,12 @@ metadata:
 spec:
   containers:
   - name: export
-    image: paulinhu/kube-audit-log-enricher:da4aafb
+    image: paulinhu/kube-audit-log-enricher:f2d7c81
+    imagePullPolicy: Always
     
     securityContext:
+      privileged: true
       readOnlyRootFilesystem: true
-      allowPrivilegeEscalation: false
-
-      capabilities:
-        drop: ["ALL"]
 
     env:
     - name: NODE_NAME
@@ -66,24 +64,24 @@ spec:
 
     volumeMounts:
     - mountPath: /dev/kmsg
-      name: syslog
+      name: devkmsg
+      readOnly: true
 
   # hostPID required in order to use cgroups to map Process IDs to Pod IDs
   hostPID: true
   
   serviceAccount: log-exporter
 
-  # TODO: remove
-  securityContext:
+  # securityContext:
 
-    seccompProfile:
-      type: Localhost
-      localhostProfile: operator/default/general/profile-complain.json
+  #   seccompProfile:
+  #     type: Localhost
+  #     localhostProfile: operator/default/general/profile-complain.json
 
   nodeName: kube-worker1
 
   volumes:
-  - name: syslog
+  - name: devkmsg
     hostPath:
       path: /dev/kmsg
       type: CharDevice

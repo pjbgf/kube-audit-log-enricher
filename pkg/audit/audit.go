@@ -9,7 +9,7 @@ import (
 var (
 	// Initially only seccomp logs  are supported
 	// type IDs are defined at https://elixir.bootlin.com/linux/latest/source/include/uapi/linux/audit.h
-	auditRegex = regexp.MustCompile(`.+audit:.+type=1326.+audit\((.+)\).+pid=(\b\d+\b).+exe="(.+)".+syscall=(\b\d+\b).*`)
+	auditRegex = regexp.MustCompile(`audit:.+type=1326.+audit\((.+)\).+pid=(\b\d+\b).+exe="(.+)".+syscall=(\b\d+\b).*`)
 )
 
 // IsAuditLine checks whether logLine is a supported audit line

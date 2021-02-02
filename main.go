@@ -40,6 +40,7 @@ func main() {
 	for {
 		line := <-auditLines
 		if audit.IsAuditLine(line) {
+
 			auditLine, err := audit.ExtractAuditLine(line)
 			if err != nil {
 				fmt.Printf("extract seccomp details from audit line: %v\n", err)
@@ -102,6 +103,8 @@ func tailDevice(device string, msgs chan string) {
 	for {
 		select {
 		case err = <-kmsgErrorsChan:
+			return
+		case <-ctx.Done():
 			return
 		case message := <-messages:
 			if message == nil {
